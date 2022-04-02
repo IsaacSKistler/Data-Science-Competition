@@ -39,17 +39,11 @@ CENSUSDATA$URScore <- UR_Data$UrbenRuralScore
 
 
 \pagebreak
-\section{Abstract}
-
-NEED TO WRITE
-
 \section{Introduction}
 
-NEED TO WRITE
+Rent prices are something that are of much importance to college graduate students, who most often live in rentals as they work to finish their degrees. As such, it is of interest to find the factors that influence rent price. In this report, we will use data from the American Communities Survey (ACS) to determine which factors affect the monthly median rent, or MMR, for a one bedroom unit, averaged over the past 5 years.
 
 \section{Data Analysis}
-
-\subsection{Summarizing Monthly Median Rent}
 
 First, we must evaluate our outcome variable and get a general idea of distribution of the data. By viewing the first set of statistics below, along with the two upper plots, we can see that MMR is heavily right skewed.
 
@@ -77,11 +71,9 @@ lsum["Mean"] <- mean(CENSUSDATA$lMMR)
 lsum
 ```
 
-We next created a log-transformed monthly median rent (lMMR) variable. This is preferred because it normalizes the distribution, which allows linear modeling assumptions to be met and also condenses the range of the data. You can see this in the two plots on the second row, along with the statistics below them.
+We next create a log-transformed monthly median rent (lMMR) variable. This is preferred because it normalizes the distribution, which allows linear modeling assumptions to be met and also condenses the range of the data. This is shown in the two plots on the second row, along with the statistics below them.
 
-\subsection{Building a Predicitive Model for Log-Transformed Monthly Median Rent}
-
-After exploring and transforming MMR, the next step is to see what relationships exist between the transformed response variable and its potential predictors. An initial step for this is to produce scatterplots, such as the two seen below, in order to spot any obvious visual trends. For example, the percentage of owner occupied residences has a negative relationship with lMMR, while there does not appear to be a strong relationship between lMMR and the percentage of residences with no vehicles available.
+After exploring and transforming MMR, the next step is to see what relationships exist between the transformed response variable and its potential predictors. An initial step for this is to produce scatterplots, such as the two in the first row below, in order to spot any obvious visual trends. For example, the percentage of owner occupied residences has a negative relationship with lMMR, while there does not appear to be a strong relationship between lMMR and the percentage of residences with no vehicles available.
 
 ```{r echo=FALSE}
 require(gridExtra)
@@ -97,14 +89,12 @@ CENSUSDATA <- CENSUSDATA %>% mutate(Region = case_when(State %in% c("ND","SD","N
 grid.arrange(CENSUSDATA %>% ggplot(aes(x=DP04_0046PE.Percent.Owner.occupied,y=lMMR)) + geom_point() + geom_point(color='navy') +labs(title="Log-Transformed MMR vs. Percentage \nOwner-Occupied Residences",y = "lMMR", x="Percent Owner Occupied"), CENSUSDATA %>% ggplot(aes(x=DP04_0058PE.Percent.No.vehicles.available,y=lMMR)) + geom_point() + geom_point(color='navy') +labs(title="Log-Transformed MMR vs. Percentage \nNo-Vehicle Residences",y = "lMMR", x="Percent No Vehicles"), CENSUSDATA %>% ggplot(aes(x=DP04_0058PE.Percent.No.vehicles.available,y=lMMR, color=Region)) + geom_point() + scale_color_manual(values=c("lightblue", "navy", "lightgreen","red")) + labs(title="Log-Transformed MMR vs. Percentage No-Vehicle Residences by Region"), layout_matrix = rbind(c(1,2),c(3,3)))
 ```
 
-Additionally, it is good to see how these variables interact with each other in different categories. Factor variables were created to classify the counties into categories based on geographical region, as well as other variables which can be found in Appendix 1. The lower plot above demonstrates the relations of this geopgraphical region to lMMR and the percentage of residences with no vehicles available in a county. From this we see that the midwest and south tend to have lower lMMR's, while the the west and northeast tend to be have higher lMMRs.
+Additionally, it is good to see how these variables interact with each other in different categories. Factor variables were created to classify the counties into categories based on geographical region, as well as other variables which can be found in Appendix 1. The plot in the second row above demonstrates the relations of this geopgraphical region to lMMR and the percentage of residences with no vehicles available in a county. From this we see that the midwest and south tend to have lower lMMR's, while the the west and northeast tend to be have higher lMMRs.
 
 
 ADD IN DATA ANALYSIS SECTION
 
-\subsection{Geographic Trends in Monthly Median Rent}
-
-In order to find any geographic trends, we created a county-level map of log-transformed monthly median rent, as seen below. From this we were able to see that the more expensive (darker) areas that would typically be considered more urbanized, such as the coast of California, the New England area, and other areas that contain large cities. In addition, although it is not a clear trend it does appear to be more expensive in areas closer to the west coast.
+In order to find any geographic trends, we created a county-level map of log-transformed monthly median rent, as seen in the first map below. From this we were able to see that the more expensive (darker) areas that would typically be considered more urbanized, such as the coast of California, the New England area, and other areas that contain large cities. In addition, although it is not a clear trend it does appear to be more expensive in areas closer to the west coast.
 
 ```{r echo=FALSE}
 #3.1
@@ -151,9 +141,72 @@ theme(axis.title=element_blank(),
 axis.text=element_blank()))
 ```
 
-In an effort to see how this compares to our predictors, we created similar maps according to several different variables, as seen in Appendix 1, and 
+In an effort to see how this compares to our predictors, we created similar maps according to several different variables. The one shown in the second map, above, shows a heat map of the percentage of the population that is Chinese, while several others can be seen in the appendix. The map of Chinese population percentage shows generally low percentages, darker areas can be seen, which do match up with some of the higher rent areas found in the US.
+
+\section{Results and Conclusion}
+
+WRITE CONCLUSION
+
+\pagebreak
+
+\section{References}
+
+Business Insider. 2018. Even the US government can't agree on how to divide up the states into regions. Available at https://www.businessinsider.com/regions-of-united-states-2018-5
+
+US Census Bureau. 2022. American Community Survey (ACS). Available at https://www.census.gov/programs-surveys/acs
+
+USDA ERS. 2019. What is Rural? Available at https://www.ers.usda.gov/topics/rural-economy-population/rural-classifications/what-is-rural/
+
+\section{Code Used}
+https://github.com/IsaacSKistler/Data-Science-Competition
+
+\pagebreak
+
+\section{Appendix: Alternative Graphs and Models}
 
 ```{r echo=FALSE}
+CENSUSDATA %>% ggplot(aes(x=DP05_0046PE.Percent.Chinese,y=lMMR)) + geom_point() + geom_point(color='navy') +labs(title="Log-Transformed MMR vs. Percent of Chinese Population",y = "lMMR", x="Percent Chinese Population")
+
+CENSUSDATA %>% ggplot(aes(x=DP04_0058PE.Percent.No.vehicles.available,y=lMMR, color=Urbanization)) + geom_point() + scale_color_manual(values=c("lightblue", "navy", "lightgreen")) +labs(title="Log-Transformed MMR vs. Percentage No-Vehicle Residences by Population",y = "lMMR", x="Percent No Vehicles")
+
+CENSUSDATA %>% ggplot(aes(x=DP04_0058PE.Percent.No.vehicles.available,y=lMMR, color=URScore)) + geom_point() + scale_color_gradient(low="lightblue", high="navy") +labs(title="Log-Transformed MMR vs. Percentage No-Vehicle Residences by Urban-Rural Score",y = "lMMR", x="Percent No Vehicles")
+
+ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=DP04_0013PE.Percent.20.or.more.units)) +
+geom_polygon(color='grey85',size=0.1) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Percent 20 or\n more units') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.2,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Percent of Housing Structures with 20 or More Units")
+
+ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=DP04_0058PE.Percent.No.vehicles.available)) +
+geom_polygon(color='grey85',size=0.1) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Percent with \n no Vehicle') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.2,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Percent with No Vehicle")
+
+ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=10-URScore)) +
+geom_polygon(color='grey85',size=0.1) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Urban-Rural \n Score') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.2,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Urban-Rural Score")
+
 ggplot(county_map2,
 mapping=aes(x=long,y=lat,group=group,
 fill=DP04_0129PE.Percent..1.000.to..1.499)) +
@@ -166,74 +219,3 @@ color='black',size=0.2,fill=NA) +
 theme(axis.title=element_blank(),
 axis.text=element_blank()) +labs(title="United States Counties by Percent with Mortgages")
 ```
-
-\section{Results and Conclusion}
-
-
-
-\pagebreak
-
-\section{Appendix 1: Alternative Graphs and Models}
-
-```{r echo=FALSE}
-CENSUSDATA %>% ggplot(aes(x=DP04_0058PE.Percent.No.vehicles.available,y=lMMR, color=Urbanization)) + geom_point() + scale_color_manual(values=c("lightblue", "navy", "lightgreen")) +labs(title="Log-Transformed MMR vs. Percentage No-Vehicle Residences by Population",y = "lMMR", x="Percent No Vehicles")
-
-CENSUSDATA %>% ggplot(aes(x=DP04_0058PE.Percent.No.vehicles.available,y=lMMR, color=10-URScore)) + geom_point() + scale_color_gradient(low="lightblue", high="navy")
-
-CENSUSDATA %>% ggplot(aes(x=DP05_0046PE.Percent.Chinese,y=lMMR)) + geom_point() + geom_point(color='navy')
-```
-
-```{r}
-ggplot(county_map2,
-mapping=aes(x=long,y=lat,group=group,
-fill=DP05_0046PE.Percent.Chinese)) +
-geom_polygon(color='grey85',size=0.1) +
-scale_fill_gradient(low='lightblue',
-high='navy',
-name='Percent Chinese') +
-geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
-color='black',size=0.2,fill=NA) +
-theme(axis.title=element_blank(),
-axis.text=element_blank())
-
-ggplot(county_map2,
-mapping=aes(x=long,y=lat,group=group,
-fill=DP04_0013PE.Percent.20.or.more.units)) +
-geom_polygon(color='grey85',size=0.1) +
-scale_fill_gradient(low='lightblue',
-high='navy',
-name='Percent 20 or\n more units') +
-geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
-color='black',size=0.2,fill=NA) +
-theme(axis.title=element_blank(),
-axis.text=element_blank())
-
-ggplot(county_map2,
-mapping=aes(x=long,y=lat,group=group,
-fill=DP04_0058PE.Percent.No.vehicles.available)) +
-geom_polygon(color='grey85',size=0.1) +
-scale_fill_gradient(low='lightblue',
-high='navy',
-name='Percent with \n no Vehicle') +
-geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
-color='black',size=0.2,fill=NA) +
-theme(axis.title=element_blank(),
-axis.text=element_blank())
-
-ggplot(county_map2,
-mapping=aes(x=long,y=lat,group=group,
-fill=10-URScore)) +
-geom_polygon(color='grey85',size=0.1) +
-scale_fill_gradient(low='lightblue',
-high='navy',
-name='Urban-Rural \n Score') +
-geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
-color='black',size=0.2,fill=NA) +
-theme(axis.title=element_blank(),
-axis.text=element_blank())
-```
-
-\section{Appendix 2: All Code Used}
-
-
-
