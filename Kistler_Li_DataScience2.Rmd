@@ -1,0 +1,430 @@
+---
+pdf_document:
+  includes:
+    in_header: preamble.tex
+title: "Data Science Competition Report"
+author: "Isaac Kistler and Enyu Li"
+date: "April 3, 2022"
+output: pdf_document
+fontsize: 11pt
+---
+
+```{r include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(maps)
+library(stringr)
+library(tidyverse)
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+#import data
+CENSUSDATA <- read.csv("C:/Users/isaki/OneDrive - University of Kentucky/Desktop/Documents/School/bSpring2022/Data Science Comp/Copy of CENSUSDATA_UPDATED03302022.csv")
+
+CENSUSDATA_CODEBOOK <- read.csv("C:/Users/isaki/OneDrive - University of Kentucky/Desktop/Documents/School/bSpring2022/Data Science Comp/OneDrive_1_3-29-2022/CENSUSDATA_CODEBOOK.csv")
+
+
+#remove NA's
+CENSUSDATA <- CENSUSDATA %>% filter(!is.na(B25031_003E.Estimate.1.bedroom5Y))
+
+#convert to numeric
+CENSUSDATA$MMR <- as.numeric(CENSUSDATA$B25031_003E.Estimate.1.bedroom5Y)
+
+#create log statistics
+CENSUSDATA$lMMR <- log(CENSUSDATA$MMR)
+
+#add urban/rural scores
+UR_Data <- read.csv("C:/Users/isaki/OneDrive - University of Kentucky/Desktop/Documents/School/bSpring2022/Data Science Comp/UR_Data.csv")
+CENSUSDATA$URScore <- UR_Data$UrbenRuralScore
+```
+
+
+\pagebreak
+\section{Introduction}
+
+Rent prices are something that are of much importance to college graduate students, who most often live in rentals as they work to finish their degrees. As such, it is of interest to find the factors that influence rent price. In this report, we will use data from the American Communities Survey (ACS) to determine which factors affect the monthly median rent, or MMR, for a one bedroom unit, averaged over the past 5 years.
+
+\section{Data Analysis}
+
+First, we must evaluate our outcome variable and get a general idea of distribution of the data. By viewing the first set of statistics below, along with the two upper plots, we can see that MMR is heavily right skewed.
+
+```{r echo=FALSE}
+#1.1
+#statistics
+sum <- summary(CENSUSDATA$MMR)
+sum["Std.Dev."] <- sd(CENSUSDATA$MMR)
+sum["Mean"] <- mean(CENSUSDATA$MMR)
+sum
+```
+
+```{r include=FALSE}
+#graphs
+require(gridExtra)
+```
+
+```{r echo=FALSE}
+grid.arrange(CENSUSDATA %>% ggplot(aes(x=MMR)) + geom_boxplot(fill="lightblue") +labs(title="Boxchart of MMR"), CENSUSDATA %>% ggplot(aes(x=MMR)) + geom_histogram(bins=30, fill="lightblue") +labs(title="Histogram of MMR",
+        y = "Count"), CENSUSDATA %>% ggplot(aes(x=lMMR)) + geom_boxplot(fill="lightblue") +labs(title="Boxchart of lMMR"), CENSUSDATA %>% ggplot(aes(x=lMMR)) + geom_histogram(bins=30, fill="lightblue") +labs(title="Histogram of lMMR", y = "Count"), ncol=2, nrow=2)
+
+lsum <- summary(CENSUSDATA$lMMR)
+lsum["Std.Dev."] <- sd(CENSUSDATA$lMMR)
+lsum["Mean"] <- mean(CENSUSDATA$lMMR)
+lsum
+```
+
+We next create a log-transformed monthly median rent (lMMR) variable. This is preferred because it normalizes the distribution, which allows linear modeling assumptions to be met and also condenses the range of the data. This is shown in the two plots on the second row, along with the statistics below them.
+
+After exploring and transforming MMR, the next step is to see what relationships exist between the transformed response variable and its potential predictors. An initial step for this is to produce scatterplots, such as the two in the first row below, in order to spot any obvious visual trends. For example, the percentage of owner occupied residences has a negative relationship with lMMR, while there does not appear to be a strong relationship between lMMR and the percentage of residences with no vehicles available. Additionally, it is good to see how these variables interact with each other in different categories. Factor variables were created to classify the counties into categories based on geographical region, as well as other variables which can be found in the appendix. The scatterplot in the second row above demonstrates the relations of this geographical region to lMMR and the percentage of residences with no vehicles available in a county. From this we see that the midwest and south tend to have lower lMMR's, while the the west and northeast tend to be have higher lMMRs.
+
+```{r echo=FALSE}
+require(gridExtra)
+CENSUSDATA <- CENSUSDATA %>% mutate(Urbanization = case_when(as.numeric(DP05_0001E.Estimate.Total.population) < 10000 ~ "Nonmetro, Noncore",
+                                                       as.numeric(DP05_0001E.Estimate.Total.population) < 50000 ~ "Nonmetro, Micropolitan",
+                                                       as.numeric(DP05_0001E.Estimate.Total.population) >= 50000 ~ "Metropolitan"))
+
+CENSUSDATA <- CENSUSDATA %>% mutate(Region = case_when(State %in% c("ND","SD","NE","KS","MN","IA","MO","WI","IL","MI","IN","OH") ~ "Midwest",
+                                                       State %in% c("ME","NH","VT","NY","PA","MD","DE","NJ","CT","RI","MA") ~ "Northeast",
+                                                       State %in% c("TX","OK","AR","LA","MS","AL","FL","GA","SC","TN","NC","KY","WV","VA") ~ "South",
+                                                       State %in% c("WA","OR","CA","AK","HI","NV","ID","MT","WY","UT","AZ","CO","NM") ~ "West"))
+
+#3.1
+CENSUSDATA <- 
+  CENSUSDATA %>% 
+  mutate_at("Geographic.Area.Name", str_replace, "Parish", "County")
+
+## Create map data frame for ggplot
+county_map<-map_data('county')
+state_map<-map_data('state')
+
+
+## Create necessary columns in your data set
+CENSUSDATA$subregion<-tolower(gsub(' County, .*','',CENSUSDATA$Geographic.Area.Name))
+CENSUSDATA$region<-tolower(gsub('.*, ','',CENSUSDATA$Geographic.Area.Name))
+county_map2<-merge(x=county_map,
+y=CENSUSDATA,
+by=c('region','subregion'),
+all=TRUE)
+
+county_map2<-county_map2[order(county_map2$order),]
+rm(county_map)
+
+grid.arrange(CENSUSDATA %>% ggplot(aes(x=DP04_0046PE.Percent.Owner.occupied,y=lMMR)) + geom_point() + geom_point(color='navy') +labs(title="Log-Transformed MMR vs. Percentage \nOwner-Occupied Residences",y = "lMMR", x="Percent Owner Occupied"), CENSUSDATA %>% ggplot(aes(x=DP04_0058PE.Percent.No.vehicles.available,y=lMMR)) + geom_point() + geom_point(color='navy') +labs(title="Log-Transformed MMR vs. Percentage \nNo-Vehicle Residences",y = "lMMR", x="Percent No Vehicles"), CENSUSDATA %>% ggplot(aes(x=DP04_0058PE.Percent.No.vehicles.available,y=lMMR, color=Region)) + geom_point() + scale_color_manual(values=c("lightblue", "navy", "lightgreen","red")) + labs(title="Log-Transformed MMR vs. Percentage No-Vehicle Residences by Region"), ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=lMMR)) +
+geom_polygon(color='grey85',size=0.05) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Log-Tranformed \n Monthly Median Rent') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.1,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Median Rent"), ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=DP05_0046PE.Percent.Chinese)) +
+geom_polygon(color='grey85',size=0.1) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Percent Chinese') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.2,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Percent Chinese"), layout_matrix = rbind(c(1,2,4,4),c(3,3,5,5)))
+```
+
+
+
+In order to find any geographic trends, we created a county-level map of log-transformed monthly median rent, as seen in the first map above. From this we were able to see that the more expensive (darker) areas that would typically be considered more urbanized, such as the coast of California, the New England area, and other areas that contain large cities. In addition, although it is not a clear trend it does appear to be more expensive in areas closer to the west coast. In an effort to see how this compares to our potential predictors, we created similar maps according to several different variables. The one shown in the second map, above, shows a heat map of the percentage of the population that is Chinese, while several others can be seen in the appendix. The map of Chinese population percentage shows generally low percentages, darker areas can be seen, which do match up with some of the higher rent areas found in the US.
+
+
+```{r eval=FALSE, include=FALSE}
+
+
+grid.arrange(ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=lMMR)) +
+geom_polygon(color='grey85',size=0.05) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Log-Tranformed \n Monthly Median Rent') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.1,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Median Rent"),ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=DP05_0046PE.Percent.Chinese)) +
+geom_polygon(color='grey85',size=0.1) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Percent Chinese') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.2,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Percent Chinese Population"))
+```
+
+
+
+To select the most important variables to fit into the final model, we use ridge regression to find the optimal $\lambda$ value via cross validation. We then start building the regression model from the variables whose coefficients are not zero. We first do a single linear regression on this and removed the two variables that are not statistically significant. We next check for collinearity by choosing one variable from each of the categories and rerunning the least square linear regression model. After that, we check the multicollinearity of the variables by checking the VIF values. 
+```{r eval=FALSE, include=FALSE}
+library(glmnet)
+CNull_data <- read.csv("C:/Users/isaki/OneDrive - University of Kentucky/Desktop/Documents/School/bSpring2022/Data Science Comp/UR_Data4.csv")
+is
+numeric_data <- select_if(CNull_data , is.numeric)
+numeric_data <- CNull_data[,sapply(CNull_data, is.numeric)]
+# cross validation to find the best lambda value
+X <- as.matrix(numeric_data[,!(names(numeric_data) %in% c("dep_var","log_depvar"))])
+
+y <- as.matrix(numeric_data$log_depvar) 
+# try to delete the original data set 
+
+CV <- cv.glmnet(x=X,y=y,family="gaussian",type.measure="class",alpha = 1,nlambda=100)
+plot(CV)
+
+fit <- glmnet(x=X,y=y,family="gaussian",type.measure="class",alpha = 1,lambda = CV$lambda.1se)
+usefulvar <- coefs[fit$beta[,1]>=0.000001]
+usefulvar
+```
+ 
+```{r include=FALSE}
+library(glmnet)
+CNull_data <- read.csv("C:/Users/isaki/OneDrive - University of Kentucky/Desktop/Documents/School/bSpring2022/Data Science Comp/UR_Data4.csv")
+is
+numeric_data <- select_if(CNull_data , is.numeric)
+numeric_data <- CNull_data[,sapply(CNull_data, is.numeric)]
+```
+
+```{r echo=FALSE}
+linear_fit <- lm(log_depvar~
+                   DP02_0068PE.Percent.Bachelor.s.degree.or.higher+
+                   DP04_0012PE.Percent.10.to.19.units+
+                   DP04_0013PE.Percent.20.or.more.units+
+                   DP04_0040PE.Percent.1.bedroom+
+                   DP04_0079PE.Percent.1.51.or.more+
+                   DP04_0129PE.Percent..1.000.to..1.499+
+                   DP04_0130PE.Percent..1.500.to..1.999+
+                   DP04_0131PE.Percent..2.000.to..2.499+
+                   DP04_0133PE.Percent..3.000.or.more+
+                   DP05_0050PE.Percent.Vietnamese+
+                   DP02_0136PE.Percent.Italian+
+                   DP02_0153PE.Percent.With.a.broadband.Internet.subscription+
+                   DP03_0091E.Estimate.Mean.nonfamily.income..dollars.,
+                 numeric_data)
+#summary(linear_fit)
+```
+
+
+```{r include=FALSE}
+library(lmtest)
+
+# This is the linear fit model 
+linear_fit <- lm(log_depvar~
+                   DP02_0068PE.Percent.Bachelor.s.degree.or.higher+
+                   DP04_0012PE.Percent.10.to.19.units+
+                   DP04_0079PE.Percent.1.51.or.more+
+                   DP04_0129PE.Percent..1.000.to..1.499+
+                   DP05_0050PE.Percent.Vietnamese+
+                   DP02_0136PE.Percent.Italian+
+                   DP02_0153PE.Percent.With.a.broadband.Internet.subscription+
+                   DP03_0091E.Estimate.Mean.nonfamily.income..dollars.
+                 ,numeric_data)
+#summary(linear_fit)
+#bptest(linear_fit)
+
+# checking the VIF
+library(car)
+#vif(linear_fit)
+```
+
+```{r include=FALSE}
+vif_values <- vif(linear_fit)
+#create horizontal bar chart to display each VIF value
+barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue")
+#add vertical line at 5
+abline(v = 5, lwd = 3, lty = 2)
+
+vars_2 <- c("DP02_0068PE.Percent.Bachelor.s.degree.or.higher",
+          "DP04_0012PE.Percent.10.to.19.units",
+          "DP04_0079PE.Percent.1.51.or.more",
+          "DP04_0129PE.Percent..1.000.to..1.499",
+          "DP05_0050PE.Percent.Vietnamese",
+          "DP02_0136PE.Percent.Italian",
+          "DP02_0153PE.Percent.With.a.broadband.Internet.subscription",
+          "DP03_0091E.Estimate.Mean.nonfamily.income..dollars.",
+          "log_depvar")
+M2 <- numeric_data[vars_2]
+colnames(M2) <- c("bachelor","Units","Occupants_1.51","Percent_Gross_Rent","Viet","Italy","Internet","Nonfamily_Income","log_dep")
+
+M2$Bachelor_Internet <- M2$bachelor + M2$Internet
+M2$Units_Internet <- M2$Units * M2$Internet
+#cor(M2)
+```
+After checking the VIF of each variable and running a correlation matrix of each explanatory variable with other variables, we found the variables bachelor, Units, Internet, and Non_family income are highly correlated with each other. Thus, we decided to drop the variable Units and to add Bachelor and Internet together to create a linear regression model which ignores unnecessary variables without significantly affecting the overall performance. 
+```{r include=FALSE}
+library(rFSA)
+data_r <- data.frame(Y = M2$log_dep,
+                   X1 =M2$Occupants_1.51,
+                   X2 =M2$Nonfamily_Income,
+                   X3 =M2$Bachelor_Internet,
+                   X4 =M2$Units,
+                   X5 =M2$Italy,
+                   X6= M2$Viet,
+                   X7= M2$Percent_Gross_Rent
+                   )
+
+fsa.fit <- FSA(formula = "Y~X1+X2+X3+X4+X5+X6+X7", data = data_r, fitfunc = lm,
+               fixvar = c('X1','X2','X3','X4','X5','X6',"X7"), quad = FALSE, m = 2,
+numrs = 10, cores = 1, interactions = T, criterion = AIC,
+minmax = "min", return.models = FALSE)
+summary(fsa.fit)
+```
+
+```{r include=FALSE}
+colnames(M2)
+final_model <- lm(log_dep~Bachelor_Internet+Occupants_1.51+Viet+Italy+Nonfamily_Income,data=M2)
+summary(final_model)
+```
+ 
+```{r include=FALSE}
+plot(final_model)
+```
+After also looking for interaction using the FSA method in R, the last step is evaluate the model and check whether all assumptions are met. The assumptions of linearity, normality, and independence are all satisfied, but the assumption of equal variance is not. Though several methods were tried, including using log transformation of the dependent variable Y and using weighted linear regression models, the assumption of equal variance is violated and the bptest score always show there exists Heteroscedasticity. The final model, along with various other plots and models, are included in the appendix.
+
+\section{Results and Conclusion}
+
+Although the model did not meet all assumptions, it can still be used as an indicator to evaluate which factors impact rent prices .The primary factors for single bedroom apartments tended to involve percentage of apartments with more than one occupant, Vietnamese and Italian populations, and income by non-family households. These all make sense for different reasons. When looking for low rent apartments, it is best to find a small apartment which only has room for one occupant in an area with lower Vietnamese and Italian populations and less income by non-family units.
+
+\pagebreak
+
+\section{References}
+
+Business Insider. 2018. Even the US government can't agree on how to divide up the states into regions. Available at https://www.businessinsider.com/regions-of-united-states-2018-5
+
+US Census Bureau. 2022. American Community Survey (ACS). Available at https://www.census.gov/programs-surveys/acs
+
+USDA ERS. 2019. What is Rural? Available at https://www.ers.usda.gov/topics/rural-economy-population/rural-classifications/what-is-rural/
+
+\section{Code Used}
+https://github.com/IsaacSKistler/Data-Science-Competition
+
+\pagebreak
+\section{Appendix: Alternative Graphs and Models}
+
+```{r echo=FALSE}
+CENSUSDATA %>% ggplot(aes(x=DP05_0046PE.Percent.Chinese,y=lMMR)) + geom_point() + geom_point(color='navy') +labs(title="Log-Transformed MMR vs. Percent of Chinese Population",y = "lMMR", x="Percent Chinese Population")
+
+CENSUSDATA %>% ggplot(aes(x=DP04_0058PE.Percent.No.vehicles.available,y=lMMR, color=Urbanization)) + geom_point() + scale_color_manual(values=c("lightblue", "navy", "lightgreen")) +labs(title="Log-Transformed MMR vs. Percentage No-Vehicle Residences by Population",y = "lMMR", x="Percent No Vehicles")
+
+CENSUSDATA %>% ggplot(aes(x=DP04_0058PE.Percent.No.vehicles.available,y=lMMR, color=URScore)) + geom_point() + scale_color_gradient(low="lightblue", high="navy") +labs(title="Log-Transformed MMR vs. Percentage No-Vehicle Residences by Urban-Rural Score",y = "lMMR", x="Percent No Vehicles")
+
+ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=DP04_0013PE.Percent.20.or.more.units)) +
+geom_polygon(color='grey85',size=0.1) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Percent 20 or\n more units') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.2,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Percent of Housing Structures with 20 or More Units")
+
+ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=DP04_0058PE.Percent.No.vehicles.available)) +
+geom_polygon(color='grey85',size=0.1) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Percent with \n no Vehicle') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.2,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Percent with No Vehicle")
+
+ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=10-URScore)) +
+geom_polygon(color='grey85',size=0.1) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Urban-Rural \n Score') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.2,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Urban-Rural Score")
+
+ggplot(county_map2,
+mapping=aes(x=long,y=lat,group=group,
+fill=DP04_0129PE.Percent..1.000.to..1.499)) +
+geom_polygon(color='grey85',size=0.1) +
+scale_fill_gradient(low='lightblue',
+high='navy',
+name='Mortgage') +
+geom_polygon(state_map,mapping=aes(x=long,y=lat,group=group),
+color='black',size=0.2,fill=NA) +
+theme(axis.title=element_blank(),
+axis.text=element_blank()) +labs(title="United States Counties by Percent with Mortgages")
+```
+
+```{r echo=FALSE}
+colnames(M2)
+final_model <- lm(log_dep~Bachelor_Internet+Occupants_1.51+Viet+Italy+Nonfamily_Income,data=M2)
+summary(final_model)
+```
+ 
+```{r echo=FALSE}
+plot(final_model)
+
+data_r <- data.frame(Y = M2$log_dep,
+                   X1 =M2$Occupants_1.51,
+                   X2 =M2$Nonfamily_Income,
+                   X3 =M2$Bachelor_Internet,
+                   X4 =M2$Units,
+                   X5 =M2$Italy,
+                   X6= M2$Viet,
+                   X7= M2$Percent_Gross_Rent
+                   )
+
+fsa.fit <- FSA(formula = "Y~X1+X2+X3+X4+X5+X6+X7", data = data_r, fitfunc = lm,
+               fixvar = c('X1','X2','X3','X4','X5','X6',"X7"), quad = FALSE, m = 2,
+numrs = 10, cores = 1, interactions = T, criterion = AIC,
+minmax = "min", return.models = FALSE)
+summary(fsa.fit)
+
+vif_values <- vif(linear_fit)
+#create horizontal bar chart to display each VIF value
+barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue")
+#add vertical line at 5
+abline(v = 5, lwd = 3, lty = 2)
+
+vars_2 <- c("DP02_0068PE.Percent.Bachelor.s.degree.or.higher",
+          "DP04_0012PE.Percent.10.to.19.units",
+          "DP04_0079PE.Percent.1.51.or.more",
+          "DP04_0129PE.Percent..1.000.to..1.499",
+          "DP05_0050PE.Percent.Vietnamese",
+          "DP02_0136PE.Percent.Italian",
+          "DP02_0153PE.Percent.With.a.broadband.Internet.subscription",
+          "DP03_0091E.Estimate.Mean.nonfamily.income..dollars.",
+          "log_depvar")
+M2 <- numeric_data[vars_2]
+colnames(M2) <- c("bachelor","Units","Occupants_1.51","Percent_Gross_Rent","Viet","Italy","Internet","Nonfamily_Income","log_dep")
+
+M2$Bachelor_Internet <- M2$bachelor + M2$Internet
+M2$Units_Internet <- M2$Units * M2$Internet
+cor(M2)
+
+linear_fit <- lm(log_depvar~
+                   DP02_0068PE.Percent.Bachelor.s.degree.or.higher+
+                   DP04_0012PE.Percent.10.to.19.units+
+                   DP04_0013PE.Percent.20.or.more.units+
+                   DP04_0040PE.Percent.1.bedroom+
+                   DP04_0079PE.Percent.1.51.or.more+
+                   DP04_0129PE.Percent..1.000.to..1.499+
+                   DP04_0130PE.Percent..1.500.to..1.999+
+                   DP04_0131PE.Percent..2.000.to..2.499+
+                   DP04_0133PE.Percent..3.000.or.more+
+                   DP05_0050PE.Percent.Vietnamese+
+                   DP02_0136PE.Percent.Italian+
+                   DP02_0153PE.Percent.With.a.broadband.Internet.subscription+
+                   DP03_0091E.Estimate.Mean.nonfamily.income..dollars.,
+                 numeric_data)
+summary(linear_fit)
+```
